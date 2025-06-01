@@ -66,6 +66,12 @@ class "VersionDef" : final() {
 }
 VersionDef = new "VersionDef"
 FaeLib.Version = new "VersionDef"("0.1.0")
+FaeLib.ClassOopVersion = new "VersionDef"("1.0.0")
+
+VersionMatches = function(version, version_def)
+    if (instanceOf(version_def, "VersionDef")) then return version >= version_def end
+    return version >= VersionDef(version_def)
+end
 
 FaeLib.Builtin.ButtonVisibilityFuncs = FaeLib.Builtin.ButtonVisibilityFuncs or {}
 local CACHED_LOCALIZATION_COLORS = {}

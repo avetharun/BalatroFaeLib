@@ -261,3 +261,5 @@ Note: they're just syntax sugar used to differentiate classes further.
 ### Final Classes
 Classes can be defined as `final()` to block the `extends` operation. Can't be applied to interfaces
 
+### Extended Tooltips
+Extended tooltips can be toggled with F3, which shows various info about modded assets
