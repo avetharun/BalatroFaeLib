@@ -85,6 +85,54 @@ FaeLib.APIs.Debugging = {
 }
 
 FaeLib.AdditionalTooltips = false
+local function colorproc(key, value)
+    local colours = (SMODS.load_file("faelib/colours.lua", value.id) or function()end)()
+    if colours then
+        FaeLib.print("Loaded colours for mod: " .. value.id)
+        for k, v in pairs(colours) do
+            if type(v) == "string" then
+                v = HEX(v)
+            end
+            if not G.ARGS.LOC_COLOURS then
+                CACHED_LOCALIZATION_COLORS[k] = v
+                goto next_color
+            end
+            G.ARGS.LOC_COLOURS[k] = v
+            ::next_color::
+        end
+    end
+end
+local function tagproc(key, value)
+    for _, file1 in ipairs(NFS.getDirectoryItems(value.path .. "faelib\\tags")) do
+        local namespace = "balatro"
+        local path = value.path .. "faelib\\tags\\" ..file1
+        local info = NFS.getInfo(path)
+        if info.type == "file" then
+            local data = {}
+            if file1:sub(-4) == ".lua" then
+                data = load(NFS.read(path))()
+                if data.values then
+                    data = data.values
+                    namespace = data.namespace or namespace
+                end
+                file1 = file1:sub(1, -5)
+            elseif file1:sub(-5) == ".json" then
+                data = JSON.decode(NFS.read(path))
+                if data.values then
+                    data = data.values
+                    namespace = data.namespace or namespace
+                end
+                file1 = file1:sub(1, -6)
+            end
+            local tag = FaeLib.CreateOrGetTag(namespace.. ":" ..file1)
+            for _, value in ipairs(data) do
+                if type(value) ~= "string" then FaeLib.print("Expected a string", "error") else
+                    tag:add(value)
+                end
+            end
+        end
+    end
+end
 
 local faelibloc = init_localization
 function init_localization()
@@ -113,21 +161,8 @@ function init_localization()
         if key == "Lovely" or key == "Balatro" or key == "faelib" or not value.can_load then
             goto skip
         end
-        local colours = (SMODS.load_file("faelib/colours.lua", value.id) or function()end)()
-        if colours then
-            FaeLib.print("Loaded colours for mod: " .. value.id)
-            for k, v in pairs(colours) do
-                if type(v) == "string" then
-                    v = HEX(v)
-                end
-                if not G.ARGS.LOC_COLOURS then
-                    CACHED_LOCALIZATION_COLORS[k] = v
-                    goto next_color
-                end
-                G.ARGS.LOC_COLOURS[k] = v
-                ::next_color::
-            end
-        end
+        colorproc(key, value)
+        tagproc(key, value)
         ::skip::
     end
     FaeLib.Builtin.Tooltips.Forager = {set = "Other", key = "faelib_forager_tooltip", vars = {}, colour = G.C.BLUE}
@@ -766,13 +801,11 @@ FaeLib.Builtin.Tooltips.extended_tooltip = new 'FaeLib.Tooltip' (
     }
 )
 
-FaeLib.Tags.ForagerCards = new 'FaeLib.Tag<Card>'("faelib:forager_cards")
-FaeLib.Tags.FoodCards = new 'FaeLib.Tag<Card>'("faelib:food_cards")
-
-FaeLib.Tags.Blinds = new 'FaeLib.Tag<Blind>'("balatro:blinds")
-
-FaeLib.Tags.BossBlinds = new 'FaeLib.Tag<Blind>'("balatro:boss_blinds")
-FaeLib.Tags.FinalBlinds = new 'FaeLib.Tag<Blind>'("balatro:final_blinds")
+FaeLib.Tags.ForagerCards = FaeLib.CreateOrGetTag("faelib:forager_cards", "Card")
+FaeLib.Tags.FoodCards = FaeLib.CreateOrGetTag("faelib:food_cards", "Card")
+FaeLib.Tags.Blinds = FaeLib.CreateOrGetTag("balatro:blinds", "Blind")
+FaeLib.Tags.BossBlinds = FaeLib.CreateOrGetTag("balatro:boss_blinds", "Blind")
+FaeLib.Tags.FinalBlinds = FaeLib.CreateOrGetTag("balatro:final_blinds", "Blind")
 
 FaeLib.Tags.Blinds:add("bl_small")
 FaeLib.Tags.Blinds:add("bl_big")

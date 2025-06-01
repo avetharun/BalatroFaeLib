@@ -27,11 +27,23 @@ if not FaeLib then
     local FaeLib_Tags = {
 
     }
+    FaeLib.CreateOrGetTag = function(tag_id, template_type)
+        if FaeLib_Tags[tag_id] then 
+            return FaeLib_Tags[tag_id]
+        end
+        return new ('FaeLib.Tag<'.. (template_type or "?") ..'>')(tag_id)
+    end
     class 'FaeLib.Tag' : template "T" {
         constructor = function (self, id, elements)
             self.elements = elements or {}
             if not id then error("Missing ID for tag!", 2) end
             self.id = id
+            if (FaeLib_Tags[self.id]) then
+                FaeLib.print("Found existing tag with ID "..id..", merging elements! Please use FaeLib.CreateOrGetTag instead!")
+                for index, value in ipairs(FaeLib_Tags[self.id]) do
+                    self.elements[index] = value
+                end
+            end
             FaeLib_Tags[id] = self
         end,
         equals = function (self, other)

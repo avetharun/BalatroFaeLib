@@ -32,7 +32,8 @@ Provides a Minecraft-like Tag implementation.
 
 Example:
 ```lua
-MyTag = new 'FaeLib.Tag<ObjectType>'("my_mod:my_tag_key")
+MyTag = FaeLib.CreateOrGetTag("mo_mod:my_tag_key") -- also can use [new 'FaeLib.Tag<ObjectType>'("my_mod:my_tag_key")], but this will warn you for it!
+-- FaeLib.CreateOrGetTag can also take a 2nd optional parameter for the Template type. 
 MyTag:add("some_id")
 local something_returned_from_smods = {
     key = "some_other_id",
@@ -49,6 +50,38 @@ MyTag:contains("some_id_that_doesnt_exist") -- -> false
 MyTag:contains("#namespace:some_tag_key") -- -> Only true if the tag key is present.
 
 ```
+Alternatively, you can define tags either in Lua or JSON with files placed in `faelib/tags/my_tag_name` 
+
+Note: Tags without a "namespace" key in their data will default to `balatro` as the namespace!
+```json
+// JSON:
+[
+    "namespace:some_key"
+]
+// Or, if you want a different namespace than "balatro" (default)
+{
+    "values" :[
+        "namespace:some_key"
+    ],
+    "namespace":"some_namespace"
+}
+```
+```lua
+-- Lua
+return {
+    "namespace:some_key"
+}
+
+-- Or, if you want a different namespace than "balatro" (default)
+
+return {
+    namespace = "some_namespace"
+    values = {
+        "namespace:some_key"
+    }
+}
+```
+
 
 ### Builtin Tags
 ```lua
