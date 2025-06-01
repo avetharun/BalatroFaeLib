@@ -1,0 +1,48 @@
+[manifest]
+version = "1.0.0"
+dump_lua = true
+priority = -10
+
+[[patches]]
+[patches.pattern]
+match_indent = true
+target = "game.lua"
+pattern = '''timer_checkpoint('debug', 'draw')'''
+position = 'before'
+# match_indent = true
+line_prepend = '$indent'
+payload = '''FaeLib.render()'''
+
+
+[[patches]]
+[patches.pattern]
+match_indent = true
+target = "card.lua"
+pattern = '''
+if self.ability.consumeable.max_highlighted then
+    update_hand_text({immediate = true, nopulse = true, delay = 0}, {mult = 0, chips = 0, level = '', handname = ''})
+end
+'''
+position = 'before'
+payload = '''
+for _, callback in ipairs(FaeLib.Builtin.Events.ConsumableUsed:get_callbacks()) do
+    callback.callback(self, area, copier)
+end
+'''
+
+
+[[patches]]
+[patches.pattern]
+match_indent = false
+target = "blind.lua"
+pattern = '''self:alert_debuff(true)'''
+position = 'after'
+payload = '''FaeLib.Builtin.Events.BlindStarted:invoke(self)'''
+
+[[patches]]
+[patches.pattern]
+match_indent = false
+target = "blind.lua"
+pattern = '''function Blind:defeat(silent)'''
+position = 'after'
+payload = '''FaeLib.Builtin.Events.BlindCompleted:invoke(self)'''

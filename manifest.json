@@ -1,0 +1,11 @@
+{
+    "name": "Faelib",
+    "version_number": "0.0.1",
+    "website_url": "",
+    "description": "Common utility functions for modding Balatro.",
+    "dependencies": [
+        "Steamopollys-Steamodded-0.8.2",
+        
+        "Thunderstore-lovely-0.7.1"
+    ]
+}
