@@ -55,6 +55,8 @@ MyTag:contains("#namespace:some_tag_key") -- -> Only true if the tag key is pres
 FaeLib.Tags.Blinds -- When using SMODS to create a new Blind, it will automatically be put in this tag.
 FaeLib.Tags.BossBlinds
 FaeLib.Tags.FinalBlinds
+FaeLib.Tags.ForagerCards -- Card-Subtype that generates cards at end of blind
+FaeLib.Tags.FoodCards
 ```
 
 
@@ -202,3 +204,52 @@ function (moving_card) -- While Moving
 end,
 )
 ```
+
+
+
+
+
+## Additional Utilities
+
+### Versioning
+Versions can either be defined using a Class or a Table.
+```lua
+version = new "VersionDef"("0.0.0")
+version = VersionDef("0.0.0")
+version = {major = 0, minor = 0, patch = 0}
+version = VersionDef({0, 0, 0})
+```
+
+For Version comparison, it must either be created using VersionDef or a class instance. 
+`version_1_0_0 > version_1_1_0`
+
+### Classes
+Classes are a simplified version of SMODS' GameObject, using [Lua-Class](https://github.com/lodsdev/lua-class/tree/main)
+
+While the main library is still the same, some additions have been made:
+
+#### Metatable Methods
+Metatable methods can be defined for classes with the following:
+
+`tostring(self)`
+
+`lt(self, other)` | `less(self,other)`
+
+`le(self, other)` | `lessequals(self,other)`
+
+`gt(self, other)` | `greater(self,other)`
+
+`ge(self, other)` | `greaterequals(self,other)`
+
+`equals(self, other)`
+
+
+### Templates
+Template arguments can be supplied when creating and defining classes.
+Note: they're just syntax sugar for usability.
+
+`class "class_name" : template "t1, t2"`
+
+### Final Classes
+Classes can be defined as `final()` to block the `extends` operation. Can't be applied to interfaces
+

@@ -14,6 +14,58 @@ assert(SMODS.load_file("init.lua", "faelib"))()
 assert(SMODS.load_file("core/enums.lua", "faelib"))()
 assert(SMODS.load_file("extensions/debugplus.lua"))()
 
+local to_version_table = function (version_def, table)
+    table = table or {}
+    if (instanceOf(version_def, "VersionDef")) then return version_def end
+    if type(version_def) == "table" then
+        table.major = version_def[0] or version_def.major or 0
+        table.minor = version_def[1] or version_def.minor or 0
+        table.patch = version_def[2] or version_def.patch or 0
+        return table
+    end
+    if (type(version_def) == "string") then
+        local major, minor, patch = version_def:match("^(%d+)%.(%d+)%.(%d+)$")
+        table.major = major or 0
+        table.minor = minor or 0
+        table.patch = patch or 0
+        return table
+    end
+    error("Unexpected type for version: " .. type(version_def))
+end
+
+class "VersionDef" : final() {
+    constructor = function (self, version_str)
+        to_version_table(version_str, self)
+    end,
+    get_major = function (self) return self.major end,
+    get_minor = function (self) return self.minor end,
+    get_patch = function (self) return self.patch end,
+    tostring = function (self)
+        return self.major .. "." .. self.minor .. "." .. self.patch
+    end,
+    equals = function (self, other)
+        local tbl = to_version_table(other)
+        return tbl.major == self.major and tbl.minor == self.minor and tbl.patch == self.patch
+    end,
+    lt = function(self, other)
+        local tbl = to_version_table(other)
+        return tbl.major < self.major and tbl.minor < self.minor and tbl.patch < self.patch
+    end,
+    gt = function(self, other)
+        local tbl = to_version_table(other)
+        return tbl.major > self.major and tbl.minor > self.minor and tbl.patch > self.patch
+    end,
+    le = function(self, other)
+        local tbl = to_version_table(other)
+        return tbl.major <= self.major and tbl.minor <= self.minor and tbl.patch <= self.patch
+    end,
+    ge = function(self, other)
+        local tbl = to_version_table(other)
+        return tbl.major >= self.major and tbl.minor >= self.minor and tbl.patch >= self.patch
+    end,
+}
+VersionDef = new "VersionDef"
+FaeLib.Version = new "VersionDef"("0.1.0")
 
 FaeLib.Builtin.ButtonVisibilityFuncs = FaeLib.Builtin.ButtonVisibilityFuncs or {}
 local CACHED_LOCALIZATION_COLORS = {}
@@ -36,7 +88,6 @@ function init_localization()
 		lc()
 	end
     local builtin_colours = (SMODS.load_file("faelib/colours.lua", "faelib") or function()end)()
-    
     if builtin_colours then
         for k, v in pairs(builtin_colours) do
             if type(v) == "string" then
@@ -260,7 +311,6 @@ class 'FaeLib.Tweener' {
         self.autorun = true
         self.index = #Tweeners + 1
         Tweeners[self.index] = self
-        
     end,
 }
 class 'FaeLib.CardMovement' {
@@ -708,7 +758,11 @@ FaeLib.Builtin.Tooltips.extended_tooltip = new 'FaeLib.Tooltip' (
     }
 )
 
+FaeLib.Tags.ForagerCards = new 'FaeLib.Tag<Card>'("faelib:forager_cards")
+FaeLib.Tags.FoodCards = new 'FaeLib.Tag<Card>'("faelib:food_cards")
+
 FaeLib.Tags.Blinds = new 'FaeLib.Tag<Blind>'("balatro:blinds")
+
 FaeLib.Tags.BossBlinds = new 'FaeLib.Tag<Blind>'("balatro:boss_blinds")
 FaeLib.Tags.FinalBlinds = new 'FaeLib.Tag<Blind>'("balatro:final_blinds")
 

@@ -161,19 +161,19 @@ function class(className)
 
     return newClasse
 end
-local mt_template  = {
-    __eq = function(a, b)
-        if type(a.equals) == "function" then
-            return a:equals(b)
-        end
-        return false
-    end,
-    __tostring = function(a)
-        if type(a.tostring) == "function" then
-            return a:tostring()
-        end
-        return a.__name
+local invoke_or_return = function(obj, name, or_else, ...)
+    if type(obj[name]) == "function" then
+        return obj[name](obj, ...)
     end
+    return or_else
+end
+local mt_template  = {
+    __eq = function(a, b) return invoke_or_return(a, "equals", false, b) end,
+    __le = function(a,b) return invoke_or_return(a, "le", false, b) or invoke_or_return(a, "lessequals", false, b) end,
+    __lt = function(a,b) return invoke_or_return(a, "lt", false, b) or invoke_or_return(a, "less", false, b) end,
+    __ge = function(a,b) return invoke_or_return(a, "ge", false, b) or invoke_or_return(a, "greaterequals", false, b) end,
+    __gt = function(a,b) return invoke_or_return(a, "gt", false, b) or invoke_or_return(a, "greater", false, b) end,
+    __tostring = function(a) return invoke_or_return(a, "tostring", a.__name) end
 }
 function new(className)
     return function(...)
@@ -236,6 +236,7 @@ function derivedFrom(instance, className)
 end
 
 function instanceOf(instance, className)
+    if not instance then return false end
     local classe = classes[className]
     if (not classe) then
         error('Class ' .. className .. ' not found', 2)
