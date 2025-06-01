@@ -246,9 +246,17 @@ Metatable methods can be defined for classes with the following:
 
 ### Templates
 Template arguments can be supplied when creating and defining classes.
-Note: they're just syntax sugar for usability.
+Note: they're just syntax sugar used to differentiate classes further.
 
 `class "class_name" : template "t1, t2"`
+
+`new class_name() -> errors: no templates provided`
+
+`new class_name<something>() -> errors, template count mismatch`
+
+`new class_name<something, something_else>() -> succeeds`
+
+`new class_name<something, something_else, something_more>() -> errors, template count mismatch`
 
 ### Final Classes
 Classes can be defined as `final()` to block the `extends` operation. Can't be applied to interfaces
