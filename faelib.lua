@@ -107,24 +107,22 @@ local function tagproc(key, value)
         local namespace = "balatro"
         local path = value.path .. "faelib\\tags\\" ..file1
         local info = NFS.getInfo(path)
+        local template_type = "?"
         if info.type == "file" then
             local data = {}
             if file1:sub(-4) == ".lua" then
                 data = load(NFS.read(path))()
-                if data.values then
-                    data = data.values
-                    namespace = data.namespace or namespace
-                end
-                file1 = file1:sub(1, -5)
+                path = file1:sub(1, -5)
             elseif file1:sub(-5) == ".json" then
                 data = JSON.decode(NFS.read(path))
-                if data.values then
-                    data = data.values
-                    namespace = data.namespace or namespace
-                end
-                file1 = file1:sub(1, -6)
+                path = file1:sub(1, -6)
             end
-            local tag = FaeLib.CreateOrGetTag(namespace.. ":" ..file1)
+            if data.values then
+                data = data.values
+                namespace = data.namespace or namespace
+                template_type = data.type or template_type
+            end
+            local tag = FaeLib.CreateOrGetTag(namespace.. ":" ..path, template_type or nil)
             for _, value in ipairs(data) do
                 if type(value) ~= "string" then FaeLib.print("Expected a string", "error") else
                     tag:add(value)
