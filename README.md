@@ -172,15 +172,15 @@ A FrameTask is used to run a function the next frame, or run a function every fr
 
 Example:
 ```lua
-new 'FaeLib.FrameTask'(function () 
-    -- Processing function
+new 'FaeLib.FrameTask'(
+    function () -- Processing function
     ...
-end, 
-true, -- Repeat forever
-1, -- Duration (Will repeat as long as this is not zero)
-function() -- Stop repeating and destroy if true
-    return should_stop_repeating
-end
+    end, 
+    true, -- Repeat forever
+    1, -- Duration (Will repeat as long as this is not zero)
+    function() -- Stop repeating and destroy if true
+        return should_stop_repeating
+    end
 )
 ```
 
@@ -191,17 +191,17 @@ Allows moving a card to an arbitrary point on the screen over time
 ```lua
 
 new 'FaeLib.CardMovement'(
-card_to_move,
-target_x,
-target_y,
-0.25, -- Duration
-1, -- Delay before returning to original position
-function(moving_card) -- Started
-end,
-function (moving_card) -- Completed
-end,
-function (moving_card) -- While Moving
-end,
+    card_to_move,
+    target_x,
+    target_y,
+    0.25, -- Duration
+    1, -- Delay before returning to original position
+    function(moving_card) -- Started
+    end,
+    function (moving_card) -- Completed
+    end,
+    function (moving_card) -- While Moving
+    end,
 )
 ```
 

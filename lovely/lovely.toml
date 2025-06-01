@@ -42,7 +42,32 @@ payload = '''FaeLib.Builtin.Events.BlindStarted:invoke(self)'''
 [[patches]]
 [patches.pattern]
 match_indent = false
+target = "state_events.lua"
+pattern = '''local hand_text_set = false'''
+position = 'after'
+payload = '''FaeLib.Builtin.Events.StartHandScoring:invoke(self)'''
+
+[[patches]]
+[patches.pattern]
+match_indent = false
 target = "blind.lua"
 pattern = '''function Blind:defeat(silent)'''
 position = 'after'
 payload = '''FaeLib.Builtin.Events.BlindCompleted:invoke(self)'''
+
+[[patches]]
+[patches.pattern]
+match_indent = false
+target = "blind.lua"
+pattern = '''
+    G.E_MANAGER:add_event(Event({
+        trigger = 'immediate',
+        func = (function()     
+            if G.GAME.modifiers.debuff_played_cards then 
+                for k, v in ipairs(scoring_hand) do v.ability.perma_debuff = true end
+            end
+        return true end)
+      }))
+'''
+position = 'after'
+payload = '''FaeLib.Builtin.Events.HandScored:invoke(self)'''

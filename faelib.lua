@@ -89,7 +89,7 @@ FaeLib.AdditionalTooltips = false
 local faelibloc = init_localization
 function init_localization()
     faelibloc()
-    print("FAELIB - Initializing localization utilities")
+    FaeLib.print("Initializing localization utilities")
 	if not G.ARGS.LOC_COLOURS then
 		lc()
 	end
@@ -106,7 +106,7 @@ function init_localization()
             G.ARGS.LOC_COLOURS[k] = v
             ::fae_next_color::
         end
-        print("Loaded buildin FaeLib colours")
+        FaeLib.print("Loaded buildin FaeLib colours")
         
     end
     for key, value in pairs(SMODS.Mods) do
@@ -115,7 +115,7 @@ function init_localization()
         end
         local colours = (SMODS.load_file("faelib/colours.lua", value.id) or function()end)()
         if colours then
-            print("Loaded colours for mod: " .. value.id)
+            FaeLib.print("Loaded colours for mod: " .. value.id)
             for k, v in pairs(colours) do
                 if type(v) == "string" then
                     v = HEX(v)
@@ -198,12 +198,12 @@ end
 G.FUNCS.faelib_button_proxy = function (e)
     local tbl = e.config.ref_table
     if not tbl then
-        print("Error: ref_table is nil in faelib_button_proxy")
+        FaeLib.print("Error: ref_table is nil in faelib_button_proxy")
         return
     end
     if tbl and tbl.button then
         local card = tbl.card
-        print("Running action for button: " .. tbl.button_id)
+        -- print("Running action for button: " .. tbl.button_id)
         tbl.button:run_action(card)
     end
 end
@@ -473,7 +473,7 @@ SMODS.DrawStep {
             end
             if button:can_display(card) then
                 if not has_button_already then
-                    print("Adding button: " .. key)
+                    FaeLib.print("Adding button: " .. key)
                     local button_id = key
                     local tbl1 = {}
                     tbl1.button = button
@@ -491,7 +491,7 @@ SMODS.DrawStep {
                     local child = card.children.faelib_button_box.nodes[i]
                     if child and child.btn_id == key then
                         card.children.faelib_button_box.nodes[i] = nil
-                        print("Removing button: " .. key)
+                        FaeLib.print("Removing button: " .. key)
                         update = true
                     end
                 end
@@ -740,6 +740,8 @@ G.P_CENTERS["bl_arm_tooltip"] = FaeLib.Builtin.Tooltips.bl_arm
 FaeLib.Builtin.Events.JokerAdded = new 'FaeLib.AbstractEventHandler' ()
 FaeLib.Builtin.Events.CardAdded = new 'FaeLib.AbstractEventHandler' ()
 FaeLib.Builtin.Events.HandPlayed = new 'FaeLib.AbstractEventHandler' ()
+FaeLib.Builtin.Events.HandScored = new 'FaeLib.AbstractEventHandler' ()
+FaeLib.Builtin.Events.StartHandScoring = new 'FaeLib.AbstractEventHandler' ()
 FaeLib.Builtin.Events.CardRemoved = new 'FaeLib.AbstractEventHandler' ()
 FaeLib.Builtin.Events.ConsumableUsed = new 'FaeLib.AbstractEventHandler' ()
 FaeLib.Builtin.Events.BlindStarted = new 'FaeLib.AbstractEventHandler' ()
