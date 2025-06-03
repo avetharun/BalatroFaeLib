@@ -932,13 +932,13 @@ local love_callbacks = {
     wheelmoved = love.wheelmoved
 }
 
-love.textinput = function (t)
-    love_callbacks.textinput(t)
-end
+-- love.textinput = function (t)
+    -- love_callbacks.textinput(t)
+-- end
 
-love.wheelmoved = function (x, y)
-    love_callbacks.wheelmoved(x, y)
-end
+-- love.wheelmoved = function (x, y)
+    -- love_callbacks.wheelmoved(x, y)
+-- end
 FaeLib.Mouse = {
     State = {
         just_pressed = {},
