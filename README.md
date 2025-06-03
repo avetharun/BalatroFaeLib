@@ -116,6 +116,12 @@ info_queue[#info_queue+1] = MyTooltip
 ### Events
 I'm not sure how to explain this, it's similar to how FabricMC does its' event handling.
 
+Events can be given a function to invoke using `:register(func, order)`
+
+The lower the order of the callback is, the sooner it'll run.
+
+The order of the callbacks only update when using `:register(...)`
+
 A custom event can be defined as follows:
 ```lua
 newEventHandler = new 'FaeLib.AbstractEventHandler' ()
@@ -123,7 +129,7 @@ newEventHandler = new 'FaeLib.AbstractEventHandler' ()
 -- Adding an event processor
 newEventHandler:register(function ()
     ...
-end)
+end, 0)
 ...
 -- somewhere, where you want all event processors to be invoked from:
 newEventHandler:invoke(...) -- This will invoke all registered event processors in the event handler
