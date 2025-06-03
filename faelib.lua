@@ -4,7 +4,7 @@
 --- MOD_AUTHOR: [feintha]
 --- MOD_DESCRIPTION: Common utility functions for modding Balatro.
 --- PRIORITY: -9999
---- 
+--- PREFIX: faelib
 --- 
 ----------------------------------------------
 ------------MOD CODE -------------------------
@@ -13,7 +13,16 @@ assert(SMODS.load_file("blind_utils.lua"))()
 assert(SMODS.load_file("init.lua", "faelib"))()
 assert(SMODS.load_file("core/enums.lua", "faelib"))()
 assert(SMODS.load_file("extensions/debugplus.lua"))()
-
+SMODS.Atlas {
+	-- Key for code to find it with
+	key = "faelib_stickers",
+	-- The name of the file, for the code to pull the atlas from
+	path = "faelib_stickers.png",
+	-- Width of each sprite in 1x size
+	px = 71,
+	-- Height of each sprite in 1x size
+	py = 95
+}
 local to_version_table = function (version_def, table)
     table = table or {}
     if (instanceOf(version_def, "VersionDef")) then return version_def end
@@ -77,7 +86,7 @@ FaeLib.Builtin.ButtonVisibilityFuncs = FaeLib.Builtin.ButtonVisibilityFuncs or {
 local CACHED_LOCALIZATION_COLORS = {}
 local lc = loc_colour
 local CardButtons = {}
-
+FaeLib.ForagerCards = {}
 FaeLib.DebugState = FaeLib.Enums.DebugState.Enabled
 local unknown_tbl = {key = "unknown"}
 FaeLib.APIs.Debugging = {
@@ -279,12 +288,12 @@ local function tweener_update_proc(self, dt)
             self.on_complete("DELAY_STARTED")
         end
         self.delay_started = false
-        if (self.delay_after and self.delay_after > 0) then
-            self.delay_after = self.delay_after - dt
+        if (self.delay_tail and self.delay_tail > 0) then
+            self.delay_tail = self.delay_tail - dt
             if (self.do_while and type(self.do_while) == "function") then
                 self:do_while(table)
             end
-            if self.delay_after > 0 then
+            if self.delay_tail > 0 then
                 return false
             else
                 self.on_complete("DELAY_COMPLETE")
@@ -339,7 +348,7 @@ class 'FaeLib.Tweener' {
         if not delay or delay < 0 then
             return self -- no delay, just return self
         end
-        self.delay_after = delay or 0
+        self.delay_tail = delay or 0
         self.do_while = do_while
         return self
     end,
@@ -393,14 +402,14 @@ class 'FaeLib.CardMovement' {
     end,
 }
 FaeLib.V.FrameTasks = {}
-class 'FaeLib.FrameTask' {
-    constructor = function(self, func, repeating, duration, should_stop_repeating)
+class 'FaeLib.Task' {
+    constructor = function(self, func, repeating, duration, should_stop_repeating, auto_start, dont_assign)
         if not func or type(func) ~= "function" then
-            error("FrameTask requires a function as an argument")
+            error("Task requires a function as an argument")
         end
         if repeating and (duration) then
             if duration > 0 then
-                error("FrameTask cannot be repeating and have a duration.")
+                error("Task cannot be repeating and have a duration.")
             end
         end
         self.duration = duration or 0
@@ -408,56 +417,49 @@ class 'FaeLib.FrameTask' {
         self.index = #FaeLib.V.FrameTasks + 1
         self.repeating = repeating or false
         self.should_stop_repeating = should_stop_repeating or function () return false end
-        FaeLib.V.FrameTasks[self.index] = self
+        self.run = auto_start or true
+        self.next_delay_time = 0
+        self.__tail = self
+        if not dont_assign then
+            FaeLib.V.FrameTasks[self.index] = self
+        end
+    end,
+    and_then = function (self, func, repeating, duration, should_stop_repeating, delay_before_starting)
+        local next_task = new 'FaeLib.Task'(func, repeating, duration, should_stop_repeating, true, true)
+        self.__tail.next = next_task
+        self.__tail.next_delay_time = delay_before_starting or self.next_delay_time or 0
+        self.__tail = self.__tail.next
+        return self
+    end,
+    with_data = function(self, data)
+        self.data = data
+        return self
+    end,
+    with_duration = function(self, duration)
+        self.duration = duration
+        return self
+    end,
+    with_delay = function(self, duration)
+        self.next_delay_time = duration
+        return self
     end
-}
-interface 'FaeLib.IBaseEvent' { 'callback' }
-interface 'FaeLib.IBaseEventHandler' { 'register', 'get_callbacks' }
-class 'FaeLib.AbstractEvent' : implements 'FaeLib.IBaseEvent' {
-    constructor = function(self, callback)
-        self.callback = callback
-    end,
-    callback = function (self, ...)end
-}
-class 'FaeLib.AbstractEventHandler' : implements 'FaeLib.IBaseEventHandler' {
-    constructor = function(self)
-        self._callbacks = {}
-    end,
-    register = function(self, callback)
-        if type(callback) ~= "function" then
-            error("Callback must be a function")
-        end
-        self._callbacks[#self._callbacks + 1] = new 'FaeLib.AbstractEvent'(callback)
-    end,
-    invoke = function(self, ...)
-        for _, callback in ipairs(self._callbacks) do
-            if callback and callback.callback then
-                callback:callback(unpack(arg))
-            end
-        end
-    end,
-    get_callbacks = function(self)
-        return self._callbacks
-    end,
 }
 
+local game_main_menu_ref = Game.main_menu
+---@diagnostic disable-next-line: duplicate-set-field
+function Game:main_menu(change_context)
+    local ret = game_main_menu_ref(self, change_context)
+    
+    UIBox{
+        definition = 
+        {n=G.UIT.ROOT, config={align = "cm", colour = G.C.UI.TRANSPARENT_DARK}, nodes={
+            {n=G.UIT.T, config={text = tostring(FaeLib.Version) .. "-FAELIB", scale = 0.3, colour = G.C.UI.TEXT_LIGHT}}
+        }}, 
+        config = {align="tri", offset = {x=0,y=-.5}, major = G.ROOM_ATTACH, bond = 'Weak'}
+    }
+    return ret
+end
 function FaeLib.render()
-    local dt= love.timer.getDelta()
-    for _, task in ipairs(FaeLib.V.FrameTasks) do
-        if task.func then
-            task.func(dt)
-            if task.duration > 0 then
-                task.duration = task.duration - dt
-                goto continue
-            end
-            if task.repeating and task.should_stop_repeating() then
-                FaeLib.V.FrameTasks[task.index] = nil
-            elseif not task.repeating or task.duration <= 0 then
-                FaeLib.V.FrameTasks[task.index] = nil
-            end
-        end
-        ::continue::
-    end
     for _, tweener in ipairs(Tweeners) do
         if (tweener_update_proc(tweener, dt)) then
             Tweeners[tweener.index] = nil
@@ -620,22 +622,22 @@ class 'FaeLib.LocalizationColor' {
         G.ARGS.LOC_COLOURS[self.key] = self.color
     end
 }
-local genui = SMODS.Center.generate_ui
-SMODS.Center.generate_ui = function (self, info_queue, card, desc_nodes, specific_vars, full_UI_table)
-    local ui_result = genui(self, info_queue, card, desc_nodes, specific_vars, full_UI_table)
-    
-    local ignore_genui_task = false
-    if (FaeLib.AdditionalTooltips) then
-        if not card then
-            card = self:create_fake_card()
-        end
-        local ability = card.ability or unknown_tbl
-        local edition = card.edition or unknown_tbl
-        local seal = card.seal or unknown_tbl
 
-        info_queue[#info_queue+1] = {set = "Other", key = "faelib_extended_info_tooltip", vars = {self.key or "unknown", self.set or "unknown", ability.key, edition.key, seal.key}}
+SMODS.Sticker{
+	key = "foraged_sticker",
+	atlas = "faelib_stickers",
+	default_compat = true,
+}
+FaeLib.Ext.GenCardExtTooltips = function (_c, info_queue, card)
+    if (FaeLib.AdditionalTooltips) then
+        if card then
+            local ability = card.ability or unknown_tbl
+            local edition = card.edition or unknown_tbl
+            local seal = card.seal or unknown_tbl
+
+            info_queue[#info_queue+1] = {set = "Other", key = "faelib_extended_info_tooltip", vars = {card.key or card.config.center.key or "unknown", card.set or "unknown", ability.key, edition.key, seal.key, type(card.sticker) == "table" and tprint(card.sticker) or card.sticker or unknown_tbl}}
+        end
     end
-    return ui_result
 end
 G.localization.descriptions["Other"] = G.localization.descriptions["Other"] or {}
 FaeLib.Builtin.PopupAtCard = function (card, data)
@@ -781,6 +783,11 @@ FaeLib.Builtin.Events.BlindStarted = new 'FaeLib.AbstractEventHandler' ()
 FaeLib.Builtin.Events.BlindSkipped = new 'FaeLib.AbstractEventHandler' ()
 FaeLib.Builtin.Events.BlindCompleted = new 'FaeLib.AbstractEventHandler' ()
 FaeLib.Builtin.Events.BlindFailed = new 'FaeLib.AbstractEventHandler' ()
+FaeLib.Builtin.Events.MousePressed = new 'FaeLib.AbstractEventHandler' ()
+FaeLib.Builtin.Events.MouseMoved = new 'FaeLib.AbstractEventHandler' ()
+FaeLib.Builtin.Events.MouseReleased = new 'FaeLib.AbstractEventHandler' ()
+FaeLib.Builtin.Events.RenderPost = new 'FaeLib.AbstractEventHandler' ()
+FaeLib.Builtin.Events.RenderPre = new 'FaeLib.AbstractEventHandler' ()
 
 FaeLib.Builtin.Tooltips.test_tooltip = new 'FaeLib.Tooltip' (
     "faelib_popup_example",
@@ -795,10 +802,13 @@ FaeLib.Builtin.Tooltips.extended_tooltip = new 'FaeLib.Tooltip' (
         "type:\"#2#\"",
         "enhancement:\"#3#\"",
         "edition:\"#4#\"",
-        "seal:\"#5#\""
+        "seal:\"#5#\"",
+        "sticker:\"#6#\""
     }
 )
-
+FaeLib.Builtin.GetCurrentBlindKey = function ()
+    return G.HUD_blind:get_UIE_by_ID('HUD_blind_name').config.object.config.string[1].ref_table.config.blind.key
+end
 FaeLib.Tags.ForagerCards = FaeLib.CreateOrGetTag("faelib:forager_cards", "Card")
 FaeLib.Tags.FoodCards = FaeLib.CreateOrGetTag("faelib:food_cards", "Card")
 FaeLib.Tags.Blinds = FaeLib.CreateOrGetTag("balatro:blinds", "Blind")
@@ -847,4 +857,216 @@ SMODS.Blind.inject = function (self, i)
     smods_oldi(self,i)
     FaeLib.Tags.Blinds:add(self)
 end
+FaeLib.SMODS = {}
+FaeLib.SMODS.RepetitionWarning = FaeLib.Enums.State.Disabled
+local smods_irep = SMODS.insert_repetitions
+SMODS.insert_repetitions = function(ret, eval, effect_card, _type)
+    repeat
+        eval.repetitions = eval.repetitions or 0
+        if eval.repetitions <= 0 then
+            if (FaeLib.SMODS.RepetitionWarning == FaeLib.Enums.State.Enabled) then
+                sendWarnMessage('Found effect table with no assigned repetitions during repetition check')
+            end
+        end
+        local effect = {}
+        for k,v in pairs(eval) do
+            if k ~= 'extra' then effect[k] = v end
+        end
+        if _type == 'joker_retrigger' then
+            effect.retrigger_card = effect_card
+            effect.message_card = effect.message_card or effect_card
+            effect.retrigger_flag = true
+        elseif _type == 'individual_retrigger' then
+            effect.retrigger_card = effect_card.object
+            effect.message_card = effect.message_card or effect_card.scored_card
+        elseif not _type then
+            effect.card = effect.card or effect_card
+        end
+        effect.message = effect.message or (not effect.remove_default_message and localize('k_again_ex'))
+        for h=1, effect.repetitions do
+            table.insert(ret, _type == "joker_retrigger" and effect or { retriggers = effect})
+        end
+        eval = eval.extra
+    until not eval
+end
 
+
+class 'FaeLib.Card.ForagerJoker' {
+    constructor = function (self, original_card, card_to_create, area)
+        self.original_card = original_card
+        self.card_to_create = card_to_create
+        self.area = area or G.deck
+        FaeLib.ForagerCards[original_card.key or original_card.config.center.key] = self
+    end,
+    create = function (self)
+        return create_playing_card({center = G.P_CENTERS[self.card_to_create.key or self.card_to_create.config.center.key]}, G.deck)
+    end
+}
+
+FaeLib.Builtin.Events.BlindCompleted:register(function (blind)
+    if (FaeLib.Tags.BossBlinds:contains(FaeLib.Builtin.GetCurrentBlindKey())) then
+        for _, value in ipairs(G.jokers.cards) do
+            if FaeLib.ForagerCards[value.config.center.key] then
+                G.E_MANAGER:add_event(Event({
+                    trigger = "immediate",
+                    func = function()
+                        local card =FaeLib.ForagerCards[value.config.center.key]:create()
+                        card.from_foraging = true
+                        card.sticker = "faelib_foraged_sticker"
+                        SMODS.calculate_context({ playing_card_added = true, cards = {card} })
+                        FaeLib.Builtin.TextPopupAtCard(card, "Foraged", G.ARGS.LOC_COLOURS.forager)
+                        return true
+                    end})
+                )
+            end
+        end
+    end
+end
+)
+local love_callbacks = {
+    mousepressed = love.mousepressed,
+    mousereleased = love.mousereleased,
+    mousemoved = love.mousemoved,
+    draw = love.draw,
+    textinput = love.textinput,
+    wheelmoved = love.wheelmoved
+}
+
+love.textinput = function (t)
+    love_callbacks.textinput(t)
+end
+
+love.wheelmoved = function (x, y)
+    love_callbacks.wheelmoved(x, y)
+end
+FaeLib.Mouse = {
+    State = {
+        just_pressed = {},
+        just_released = {}
+    },
+    was_pressed = function (button) return FaeLib.Mouse.State.just_pressed[button] or false end,
+    was_released = function (button) return FaeLib.Mouse.State.just_released[button] or false end
+}
+love.mouse.was_pressed = function (button) return FaeLib.Mouse.State.just_pressed[button] or false end
+love.mouse.was_released = function (button) return FaeLib.Mouse.State.just_released[button] or false end
+love.draw = function ()
+    for index, _ in ipairs(FaeLib.Mouse.State.just_pressed) do
+        FaeLib.Mouse.State.just_pressed[index] = false
+    end
+    for index, _ in ipairs(FaeLib.Mouse.State.just_released) do
+        FaeLib.Mouse.State.just_released[index] = false
+    end
+    FaeLib.Builtin.Events.RenderPre:invoke()
+    love_callbacks.draw()
+    FaeLib.Builtin.Events.RenderPost:invoke()
+    
+    local dt= love.timer.getDelta()
+    for _, task in ipairs(FaeLib.V.FrameTasks) do
+        if task.run then
+            task.next_delay_time = task.next_delay_time or 0
+            if task.duration > 0 or task.next_delay_time > 0 then
+                if task.func then
+                    task:func(dt)
+                end
+                if task.duration <= 0 and task.next_delay_time > 0 then
+                    task.next_delay_time = task.next_delay_time - dt
+                end
+                if task.duration > 0 then
+                    task.duration = task.duration - dt
+                end
+                goto continue
+            end
+            if task.repeating and task.should_stop_repeating() then
+                if task.next then
+                    task.next.run=true
+                    task.next.data = task.data
+                    table.remove(FaeLib.V.FrameTasks, _)
+                    FaeLib.V.FrameTasks[#FaeLib.V.FrameTasks+1] = task.next
+                    if task.next.func then
+                        task.next:func(dt)
+                    end
+                else
+                    FaeLib.V.FrameTasks[_] = nil
+                end
+                goto continue
+            end
+            if not task.repeating and (task.duration <= 0 and task.next_delay_time <= 0) then
+                if task.next then
+                    task.next.run=true
+                    task.next.data = task.data
+                    table.remove(FaeLib.V.FrameTasks, _)
+                    FaeLib.V.FrameTasks[#FaeLib.V.FrameTasks+1] = task.next
+                    if task.next.func then
+                        task.next:func(dt)
+                    end
+                else
+                    table.remove(FaeLib.V.FrameTasks, _)
+                end
+                goto continue
+            end
+        end
+        ::continue::
+    end
+end
+love.mousemoved = function (x, y, dx, dy, is_touch)
+    love_callbacks.mousemoved(x,y,dx,dy,is_touch)
+    FaeLib.Builtin.Events.MouseMoved:invoke(x,y,dx,dy,is_touch)
+end
+love.mousepressed = function( x, y, button, touch )
+	love_callbacks.mousepressed(x,y,button, touch)
+    FaeLib.Builtin.Events.MousePressed:invoke(x,y,button, touch)
+    FaeLib.Mouse.State.just_pressed[button] = true
+end
+love.mousereleased = function( x, y, button, touch )
+	love_callbacks.mousereleased(x,y,button, touch)
+    FaeLib.Builtin.Events.MouseReleased:invoke(x,y,button, touch)
+    FaeLib.Mouse.State.just_released[button] = true
+end
+
+FaeLib.APIs.Drawing = {}
+FaeLib.APIs.Drawing.text_centered = function(text, x, y, rads, scx, scy, kx, ky, y_align)
+	y_align = y_align or false
+	local w = love.graphics.getFont():getWidth(text)
+	local h = y_align and w or 0
+	love.graphics.print(text, x - w*0.5, y - h*0.5, rads, scx, scy, kx, ky)
+end
+FaeLib.APIs.Drawing.text_ease_alpha = function(text, x, y, rgb_colour, fade_in_time, hold_time, fade_out_time, easing)
+    easing = easing or lerp
+    new 'FaeLib.Task'(function (self, delta)
+        self.data.color[4] = math.min(easing(self.data.color[4], 1, delta / fade_in_time), 1)
+        love.graphics.setColor(self.data.color[1], self.data.color[2], self.data.color[3], self.data.color[4])
+        love.graphics.print(text, self.data.pos.x, self.data.pos.y)
+    end, false, fade_in_time)
+    :with_data({
+        color = {rgb_colour[1], rgb_colour[2], rgb_colour[3], 0}, -- Start with alpha = 0
+        pos = {x = x, y = y}
+    })
+    :with_delay(hold_time)
+    :and_then(
+        function (self, delta)
+            self.data.color[4] = math.max(easing(self.data.color[4], 0, delta / fade_out_time), 0)
+            love.graphics.setColor(self.data.color[1], self.data.color[2], self.data.color[3], self.data.color[4])
+            love.graphics.print(text, self.data.pos.x, self.data.pos.y)
+        end, false, fade_out_time
+    )
+end
+FaeLib.APIs.Drawing.text_ease_alpha_centered = function(text, x, y, rgb_colour, fade_in_time, hold_time, fade_out_time, easing, center_y)
+    easing = easing or lerp
+    new 'FaeLib.Task'(function (self, delta)
+        self.data.color[4] = math.min(easing(self.data.color[4], 1, delta / fade_in_time), 1)
+        love.graphics.setColor(self.data.color[1], self.data.color[2], self.data.color[3], self.data.color[4])
+        FaeLib.APIs.Drawing.text_centered(text, self.data.pos.x, self.data.pos.y, center_y)
+    end, false, fade_in_time)
+    :with_data({
+        color = {rgb_colour[1], rgb_colour[2], rgb_colour[3], 0}, -- Start with alpha = 0
+        pos = {x = x, y = y}
+    })
+    :with_delay(hold_time)
+    :and_then(
+        function (self, delta)
+            self.data.color[4] = math.max(easing(self.data.color[4], 0, delta / fade_out_time), 0)
+            love.graphics.setColor(self.data.color[1], self.data.color[2], self.data.color[3], self.data.color[4])
+            FaeLib.APIs.Drawing.text_centered(text, self.data.pos.x, self.data.pos.y)
+        end, false, fade_out_time
+    )
+end

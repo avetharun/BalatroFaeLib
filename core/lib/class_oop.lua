@@ -213,6 +213,7 @@ function new(className)
         if (newObj.constructor) then
             newObj:constructor(...)
         end
+        
         if newObj.metatable then
             setmetatable(newObj, newObj.metatable)
         else
@@ -221,7 +222,12 @@ function new(className)
         return newObj
     end
 end
-
+---Returns the templates used when running `new`
+---@param instance any
+---@return table|nil
+function get_template_types(instance)
+    return instance.__template_t
+end
 function derivedFrom(instance, className)	
     local class = classes[className]
     if(not class) then

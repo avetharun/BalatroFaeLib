@@ -130,11 +130,18 @@ newEventHandler:invoke(...) -- This will invoke all registered event processors 
 ...
 ```
 
-Builtin Events:
+Builtin Events: (working list)
 ```lua
-FaeLib.Builtin.Events.ConsumableUsed
-FaeLib.Builtin.Events.BlindStarted
-FaeLib.Builtin.Events.BlindCompleted
+FaeLib.Builtin.Events.ConsumableUsed -> (card)
+FaeLib.Builtin.Events.BlindStarted -> (blind)
+FaeLib.Builtin.Events.BlindCompleted -> (blind)
+
+FaeLib.Builtin.Events.RenderPre -> ()
+FaeLib.Builtin.Events.RenderPost -> ()
+
+FaeLib.Builtin.Events.MousePressed -> (x, y, is_touch)
+FaeLib.Builtin.Events.MouseReleased -> (x, y, is_touch)
+FaeLib.Builtin.Events.MouseMoved -> (x, y, dx, dy, is_touch)
 ```
 
 ### Card Buttons
@@ -190,34 +197,52 @@ Constructor:
 
 Member Functions:
 
-`tweener:set(name, value)` Function used to set the property to the table
+`FaeLib.Tweener:set(name, value)` Function used to set the property to the table
 
-`tweener:and_reverse()` Appends a new reversed tweener from the current one. (ie, reversed.start = current.end, reversed.end = current.start)
+`FaeLib.Tweener:and_reverse()` Appends a new reversed tweener from the current one. (ie, reversed.start = current.end, reversed.end = current.start)
 
-`tweener:then_wait(duration, waiting_function)` After this tweener is completed, wait a specified duration before proceeding to the next tweener
+`FaeLib.Tweener:then_wait(duration, waiting_function)` After this tweener is completed, wait a specified duration before proceeding to the next tweener
 
-`tweener:and_then(tweener: FaeLib.Tweener)` Appends a new tweener to run after this tweener is complete
+`FaeLib.Tweener:and_then(tweener: FaeLib.Tweener)` Appends a new tweener to run after this tweener is complete
 
 
 
-### Frame Tasks
-A FrameTask is used to run a function the next frame, or run a function every frame.
+### Tasks and Task Chains
+A Task is used to run a function the next frame, or run a function every frame. These can be chained together similarly to Tweeners, and how Balatro's G_EVENT manager works.
 
 Example:
 ```lua
-new 'FaeLib.FrameTask'(
-    function () -- Processing function
+new 'FaeLib.Task'(
+    function (self, frame_delta) -- Processing function
     ...
     end, 
     true, -- Repeat forever
     1, -- Duration (Will repeat as long as this is not zero)
     function() -- Stop repeating and destroy if true
         return should_stop_repeating
-    end
+    end,
+    true, -- auto-start the chain
 )
 ```
 
+Task Chains can be created using FaeLib.Task:and_then(...), and will append to the end of the "chain"
+A "chain" is ran in the order it's added, and will wait some duration before going to the next chain, if specified.
 
+- Unlike Tweeners, the current link while "delaying" will execute its' main task function.
+
+*Internally, these work like Linked Lists.*
+
+`FaeLib.Task:with_data(data) -> FaeLib.Task (head)` Assigns data to this task, and all tasks in the chain.
+
+`FaeLib.Task:with_delay(delay) -> FaeLib.Task (head)` Assigns the delay before the next chain will be executed
+
+`FaeLib.Task:and_then(func, repeating, duration, [should_stop_repeating], [delay_before_starting]) -> FaeLib.Task (head)` Appends a new task "link" to the end of the task chain
+- If a task "link" is repeating, it will wait until should_stop_repeating returns true to execute the next link in the chain.
+
+
+
+`FaeLib.Task:with_duration(duration) -> FaeLib.Task (head)` Changes the duration this chain will be running for.
+- You can bypass the error for repeating using this. Though, the duration will still go down while it's running.
 
 ### Card Movement
 Allows moving a card to an arbitrary point on the screen over time
@@ -277,6 +302,23 @@ Metatable methods can be defined for classes with the following:
 `equals(self, other)`
 
 
+### Rendering Utilities
+
+
+`FaeLib.APIs.Drawing.text_centered(text, x, y, rads, scx, scy, kx, ky, y_align)` 
+- Modification of love.graphics.print to print text centered upon (x, y). Optionally align the height as well.
+
+`FaeLib.APIs.Drawing.text_ease_alpha(text, x, y, rgb_colour, fade_in_time, hold_time, fade_out_time, easing)`
+- Uses love.graphics.print to draw text that fades in, holds, and fades out over time. Optionally, change easing function (x,y,time)
+
+`FaeLib.APIs.Drawing.text_ease_alpha_centered(text, x, y, rgb_colour, fade_in_time, hold_time, fade_out_time, easing, center_y)`
+- Variant of `text_ease_alpha` that draws centered. See FaeLib.APIs.Drawing.text_centered
+
+
+Currently, text_ease_alpha, text_ease_alpha_centered do not respect rotation, scale, or shearing. You'll need to use LOVE's matrix transforms for this.
+\* will be changed in the future
+
+
 ### Templates
 Template arguments can be supplied when creating and defining classes.
 Note: they're just syntax sugar used to differentiate classes further.
@@ -296,3 +338,17 @@ Classes can be defined as `final()` to block the `extends` operation. Can't be a
 
 ### Extended Tooltips
 Extended tooltips can be toggled with F3, which shows various info about modded assets
+
+
+### Added LOVE API functions
+Mouse Button pressed
+
+Returns whether the mouse was pressed this frame
+- `love.mouse.was_pressed(button) -> bool`
+- `FaeLib.Mouse.was_pressed(button) -> bool`
+
+Mouse Button released
+
+Returns whether the mouse was released this frame
+- `love.mouse.was_released(button) -> bool`
+- `FaeLib.Mouse.was_released(button) -> bool`
