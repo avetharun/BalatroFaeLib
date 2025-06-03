@@ -789,6 +789,9 @@ FaeLib.Builtin.Events.MouseReleased = new 'FaeLib.AbstractEventHandler' ()
 FaeLib.Builtin.Events.RenderPost = new 'FaeLib.AbstractEventHandler' ()
 FaeLib.Builtin.Events.RenderPre = new 'FaeLib.AbstractEventHandler' ()
 
+
+FaeLib.Builtin.Events.KeyPressed = new 'FaeLib.AbstractEventHandler' ()
+
 FaeLib.Builtin.Tooltips.test_tooltip = new 'FaeLib.Tooltip' (
     "faelib_popup_example",
     "Faelib Test Popup",
@@ -950,12 +953,6 @@ FaeLib.Mouse = {
 love.mouse.was_pressed = function (button) return FaeLib.Mouse.State.just_pressed[button] or false end
 love.mouse.was_released = function (button) return FaeLib.Mouse.State.just_released[button] or false end
 love.draw = function ()
-    for index, _ in ipairs(FaeLib.Mouse.State.just_pressed) do
-        FaeLib.Mouse.State.just_pressed[index] = false
-    end
-    for index, _ in ipairs(FaeLib.Mouse.State.just_released) do
-        FaeLib.Mouse.State.just_released[index] = false
-    end
     FaeLib.Builtin.Events.RenderPre:invoke()
     love_callbacks.draw()
     FaeLib.Builtin.Events.RenderPost:invoke()
@@ -1006,6 +1003,12 @@ love.draw = function ()
             end
         end
         ::continue::
+    end
+    for index, _ in ipairs(FaeLib.Mouse.State.just_pressed) do
+        FaeLib.Mouse.State.just_pressed[index] = false
+    end
+    for index, _ in ipairs(FaeLib.Mouse.State.just_released) do
+        FaeLib.Mouse.State.just_released[index] = false
     end
 end
 love.mousemoved = function (x, y, dx, dy, is_touch)
