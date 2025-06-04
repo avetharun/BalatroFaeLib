@@ -94,6 +94,10 @@ FaeLib.APIs.Debugging = {
 }
 
 FaeLib.AdditionalTooltips = false
+function FaeLib.debug()
+    return FaeLib.AdditionalTooltips == FaeLib.Enums.DebugState.Enabled
+
+end
 local function colorproc(key, value)
     local colours = (SMODS.load_file("faelib/colours.lua", value.id) or function()end)()
     if colours then
@@ -255,7 +259,10 @@ FaeLib.smoothstep = function(a, b, t)
   return a + (b - a) * t
 end
 local CardMovements = {}
-local function lerp(a,b,t) return a * (1-t) + b * t end
+function FaeLib.lerp(a,b,t) return a * (1-t) + b * t end
+function FaeLib.easeInCirc(a, b, t)
+    return FaeLib.lerp(a, b, 1 - math.sqrt(1 - (t * t)))
+end
 local function easeInOutQuint(x)
     if x < 0.5 then
         return 16 * x * x * x * x * x
@@ -263,143 +270,185 @@ local function easeInOutQuint(x)
         return 1 - ((-2 * x + 2) ^ 5) / 2
     end
 end
-local Tweeners = {}
-local function tweener_update_proc(self, dt)
-    self.elapsed_time = self.elapsed_time + dt
-    -- assume tween is a delay/wait tween
-    if self.name == nil or self.table == nil then
-        return self.elapsed_time >= self.duration
-    end
-    if self.elapsed_time < self.duration then
-        if type(self.name) == "table" then
-            -- if name is a table, we assume it's a table of names to tween
-            for _, name in ipairs(self.name) do
-                self.set(self, name, self.easing(self.from[name], self.to[name], self.elapsed_time / self.duration))
-            end
-            self.on_set(self.table, self.name, self.table)
-        else
-            -- otherwise, we assume it's a single name
-            self.set(self, self.name, self.easing(self.from, self.to, self.elapsed_time / self.duration))
-            self.on_set(self.table, self.name, self.table[self.name])
-        end
-    elseif self.elapsed_time >= self.duration then
-        self.table[self.name] = self.to
-        if self.delay_started then
-            self.on_complete("DELAY_STARTED")
-        end
-        self.delay_started = false
-        if (self.delay_tail and self.delay_tail > 0) then
-            self.delay_tail = self.delay_tail - dt
-            if (self.do_while and type(self.do_while) == "function") then
-                self:do_while(table)
-            end
-            if self.delay_tail > 0 then
-                return false
-            else
-                self.on_complete("DELAY_COMPLETE")
-            end
-        end
-        if self.next_tweener then
-            Tweeners[self.index] = self.next_tweener
-            self.next_tweener.index = self.index
-            self.next_tweener.autorun = true
-            return false
-        elseif self.destroy_when_complete then
-            Tweeners[self.index] = nil
-        end
-        return true
-    end
-    return false
+function FaeLib.map(f, s1, e1, s2, e2)
+    return s2 + (f - s1) * (e2 - s2) / (e1 - s1)
 end
 class 'FaeLib.Tweener' {
     constructor = function (self, name, table, duration, easing, from, to, autorun, on_complete, on_set, destroy_when_complete)
         self.table = table
         self.name = name
         self.duration = duration or 1
-        self.easing = easing or lerp
+        self.easing = easing or FaeLib.lerp
         self.from = from or 0
         self.to = to or 1
-        self.elapsed_time = 0
         self.autorun = autorun
-        self.completed = false
-        self.next_tweener = nil
-        self.delay_started = true
-        self.on_complete = on_complete or function (delay_completed) end
-        self.on_set = on_set or function (table, name, value) end
+        self.on_complete = on_complete or function () end
+        self.on_set = on_set or function () end
         self.destroy_when_complete = destroy_when_complete or true
-        if self.autorun then
-            self.index = #Tweeners + 1
-            Tweeners[self.index] = self
-        else 
-            self.autorun = true
-        end
+        self.task = new 'FaeLib.Task'(function (task, dt)
+            self.easing = self.easing or FaeLib.lerp
+            self.elapsed_time = (self.elapsed_time or 0) + dt
+            if type(self.name) == "table" then
+                -- if name is a table, we assume it's a table of names to tween
+                
+                for _, name in ipairs(self.name) do
+                    self.set(self, name, self.easing(self.from[name], self.to[name], self.elapsed_time / self.duration))
+                end
+                self.on_set(self.table, self.name, self.table)
+            else
+                -- otherwise, we assume it's a single name
+                self.set(self, self.name, self.easing(self.from, self.to, self.elapsed_time / self.duration))
+                self.on_set(self.table, self.name, self.table[self.name])
+            end
+        end, false, self.duration, nil, self.autorun ):with_data(self)
     end,
     set = function (self, name, value)
+        -- print(value)
         self.table[name] = value
     end,
-    and_reverse = function (self)
-        return self.and_then(self, new 'FaeLib.Tweener' (self.name, self.table, self.duration, self.easing, self.to, self.from, false, self.on_complete, self.on_set))
+    and_reverse = function (self, duration)
+        return self:and_then(self.to, self.from, duration or self.duration)
     end,
-    and_then = function (self, tweener)
-        self.next_tweener = tweener
-        return self.next_tweener
-    end,
-    then_wait = function (self, delay, do_while)
-        if not delay or delay < 0 then
-            return self -- no delay, just return self
-        end
-        self.delay_tail = delay or 0
-        self.do_while = do_while
+    and_then = function (self, from, to, duration)
+        duration = duration or 0
+        local elapsed_time = 0
+        self.task = self.task:and_then(
+            function (task, dt)
+                elapsed_time = elapsed_time + dt
+                if type(self.name) == "table" then
+                    for _, name in ipairs(self.name) do
+                        self.set(self, name, self.easing(from[name], to[name], elapsed_time / duration))
+                    end
+                    self.on_set(self.table, self.name, self.table)
+                else
+                    self.set(self, self.name, self.easing(from, to, elapsed_time / duration))
+                    self.on_set(self.table, self.name, self.table[self.name])
+                end
+        end, false, duration
+        )
         return self
     end,
-    run = function (self)
-        if self.autorun then
-            return
-        end
-        self.autorun = true
-        self.index = #Tweeners + 1
-        Tweeners[self.index] = self
+    then_wait = function (self, delay, while_delaying)
+        self.task = self.task:and_then(while_delaying or function()end, false, delay)
+        return self
     end,
+    after = function(self, callback) 
+        self.task = self.task:and_then(callback, false, 0)
+        return self
+    end,
+
+    run = function (self)
+        self.task.run = true
+        return self
+    end,
+    wait_to_start = function(self, delay)
+        self.task = self.task:wait_to_start(delay)
+        return self
+    end
 }
+function FaeLib.Builtin.DeepCopyTable(o, seen)
+  seen = seen or {}
+  if o == nil then return nil end
+  if seen[o] then return seen[o] end
+
+  local no
+  if type(o) == 'table' then
+    no = {}
+    seen[o] = no
+
+    for k, v in next, o, nil do
+      no[FaeLib.Builtin.DeepCopyTable(k, seen)] = FaeLib.Builtin.DeepCopyTable(v, seen)
+    end
+    setmetatable(no, FaeLib.Builtin.DeepCopyTable(getmetatable(o), seen))
+  else -- number, string, boolean, etc
+    no = o
+  end
+  return no
+end
+
 class 'FaeLib.CardMovement' {
-    constructor = function(self, card, target_x, target_y, duration, delay, delay_started, delay_ended, while_delaying, movement_completed)
+    constructor = function(self, card, target_x, target_y, duration, delay, start,while_delaying, finished, reverses, returns_to_area, easing, reverse_duration, delay_started)
         self.card = card
         self.target_x = target_x
         self.target_y = target_y
+        self.start_x = card.T.x
+        self.start_y = card.T.y
+        self.x = 0
+        self.y = 0
         self.duration = (duration or 1)
-        new 'FaeLib.Tweener' (
-            {"x", "y"},
-            {x=0,y=0},
-            self.duration,
-            smoothstep,
-            {x = card.T.x, y = card.T.y},
-            {x = self.target_x, y = self.target_y},
-            true,
-            function (completion_state)
-                if completion_state == "DELAY_STARTED" and delay_started and not self.started_once then
-                    self.started_once = true
-                    delay_started(card)
-                    return
-                end
-                if completion_state == "DELAY_COMPLETE" and delay_ended and not self.completed_once then
-                    self.completed_once = true
-                    delay_ended(card)
-                    return
-                end
-                if movement_completed and completion_state ~= "DELAY_COMPLETE" and completion_state ~= "DELAY_STARTED" then
-                    -- movement_completed(card)
-                end
-            end,
-            function (table, name, value)
-                card:hard_set_T(value.x, value.y, card.T.w, card.T.h)
+        self.area = card.area
+        self.index = 0
+        self.lookat = false
+        self.easing = easing or FaeLib.lerp
+        self:__card_pop()
+        local tweener = new 'FaeLib.Tweener'({"x", "y"},
+            self,
+            duration,
+            self.easing,
+            {x=self.start_x, y=self.start_y},
+            {x=self.target_x, y=self.target_y},
+            true,nil,
+            function (tbl, name, value)self:__card_setpos()end
+        )
+        if delay and delay > 0 then
+            if delay_started then
+                tweener = tweener:after(delay_started)
             end
-        ):then_wait(delay or 0.1, function (_self, table)
-            card:hard_set_T(target_x, target_y, card.T.w, card.T.h)
-            if while_delaying then
-                while_delaying(_self, table)
+            tweener = tweener:then_wait(delay, while_delaying)
+        end
+        if reverses then
+            tweener = tweener:and_reverse(reverse_duration or duration)
+        end
+        if returns_to_area then
+            tweener = tweener:after(function ()
+                self:__card_return()
+            end)
+        end
+        tweener = tweener:after(function ()
+            if type(finished) == "function" then
+                finished()
             end
-        end):and_reverse()
+            card.area = self.area
+        end)
+        start()
     end,
+    __card_setpos = function (self)
+        local w = (self.card.T.w)
+        local h = (self.card.T.h)
+        Moveable.hard_set_T(self.card,self.x, self.y, w, h)
+        if self.card.children.front then self.card.children.front:hard_set_T(self.x, self.y, w, h) end
+        self.card.children.back:hard_set_T(self.x, self.y, w, h)
+        self.card.children.center:hard_set_T(self.x, self.y, w, h)
+    end,
+    __card_pop = function (self)
+        for i = #self.area.cards,1,-1 do
+            if self.area.cards[i] == self.card then
+                self.card:remove_from_area()
+                table.remove(self.area.cards, i)
+                local t = FaeLib.Builtin.DeepCopyTable(self.card)
+                t.faelib_card_movement = i
+                t.draw = function ()end
+                table.insert(self.area.cards, i, t)
+                index = i
+                self.area:remove_from_highlighted(self.card, true)
+                break
+            end
+        end
+    end,
+    __card_return = function (self)
+        for i = #self.area.cards,1,-1 do
+            local current = self.area.cards[i]
+            if self.area.cards[i].faelib_card_movement == index then
+                current:remove_from_area()
+                table.remove(self.area.cards, i)
+                table.insert(self.area.cards, i, self.card)
+                break
+            end
+        end
+    end,
+    looks_at_target = function (self)
+        self.lookat = true
+    end
 }
 FaeLib.V.FrameTasks = {}
 class 'FaeLib.Task' {
@@ -420,6 +469,8 @@ class 'FaeLib.Task' {
         self.run = auto_start or true
         self.next_delay_time = 0
         self.__tail = self
+        self.start_delay_time = 0
+        self._dont_run_while_delaying = false
         if not dont_assign then
             FaeLib.V.FrameTasks[self.index] = self
         end
@@ -435,6 +486,10 @@ class 'FaeLib.Task' {
         self.data = data
         return self
     end,
+    dont_run_while_delaying = function(self)
+        self.__tail._dont_run_while_delaying = true
+        return self
+    end,
     with_duration = function(self, duration)
         self.duration = duration
         return self
@@ -442,9 +497,16 @@ class 'FaeLib.Task' {
     with_delay = function(self, duration)
         self.next_delay_time = duration
         return self
+    end,
+    wait_to_start = function(self, duration)
+        self.start_delay_time = duration
+        return self
+    end,
+    start = function(self)
+        self.run = true
+        return self
     end
 }
-
 local game_main_menu_ref = Game.main_menu
 ---@diagnostic disable-next-line: duplicate-set-field
 function Game:main_menu(change_context)
@@ -460,14 +522,7 @@ function Game:main_menu(change_context)
     return ret
 end
 function FaeLib.render()
-    for _, tweener in ipairs(Tweeners) do
-        if (tweener_update_proc(tweener, dt)) then
-            Tweeners[tweener.index] = nil
-            if tweener.on_complete then
-                tweener.on_complete(tweener.table)
-            end
-        end
-    end
+    local dt= love.timer.getDelta()
 end
 
 
@@ -814,6 +869,7 @@ FaeLib.Builtin.GetCurrentBlindKey = function ()
 end
 FaeLib.Tags.ForagerCards = FaeLib.CreateOrGetTag("faelib:forager_cards", "Card")
 FaeLib.Tags.FoodCards = FaeLib.CreateOrGetTag("faelib:food_cards", "Card")
+FaeLib.Tags.AmogusCards = FaeLib.CreateOrGetTag("faelib:amogus_cards", "Card")
 FaeLib.Tags.Blinds = FaeLib.CreateOrGetTag("balatro:blinds", "Blind")
 FaeLib.Tags.BossBlinds = FaeLib.CreateOrGetTag("balatro:boss_blinds", "Blind")
 FaeLib.Tags.FinalBlinds = FaeLib.CreateOrGetTag("balatro:final_blinds", "Blind")
@@ -852,6 +908,7 @@ FaeLib.Tags.FinalBlinds:add("bl_final_leaf")
 FaeLib.Tags.FinalBlinds:add("bl_final_vessel")
 
 
+FaeLib.Tags.BossBlinds:add("#balatro:final_blinds")
 FaeLib.Tags.Blinds:add("#balatro:boss_blinds")
 FaeLib.Tags.Blinds:add("#balatro:final_blinds")
 
@@ -960,16 +1017,22 @@ love.draw = function ()
     local dt= love.timer.getDelta()
     for _, task in ipairs(FaeLib.V.FrameTasks) do
         if task.run then
+            if task.start_delay_time and task.start_delay_time > 0 then
+                task.start_delay_time = task.start_delay_time - dt
+                goto continue
+            end
             task.next_delay_time = task.next_delay_time or 0
             if task.duration > 0 or task.next_delay_time > 0 then
-                if task.func then
-                    task:func(dt)
-                end
                 if task.duration <= 0 and task.next_delay_time > 0 then
                     task.next_delay_time = task.next_delay_time - dt
                 end
                 if task.duration > 0 then
                     task.duration = task.duration - dt
+                end
+                if not task._dont_run_while_delaying then
+                    if task.func then
+                        task:func(dt)
+                    end
                 end
                 goto continue
             end
@@ -1029,16 +1092,16 @@ end
 FaeLib.APIs.Drawing = {}
 FaeLib.APIs.Drawing.text_centered = function(text, x, y, rads, scx, scy, kx, ky, y_align)
 	y_align = y_align or false
-	local w = love.graphics.getFont():getWidth(text)
-	local h = y_align and w or 0
-	love.graphics.print(text, x - w*0.5, y - h*0.5, rads, scx, scy, kx, ky)
+	local w = love.graphics.getFont():getWidth(text) * 0.5
+	local h = (y_align and w or 0) * 0.5
+	love.graphics.print(text, x - w, y - h, rads, scx, scy, w, h, kx, ky)
 end
-FaeLib.APIs.Drawing.text_ease_alpha = function(text, x, y, rgb_colour, fade_in_time, hold_time, fade_out_time, easing)
+FaeLib.APIs.Drawing.text_ease_alpha = function(text, x, y, rgb_colour, fade_in_time, hold_time, fade_out_time, easing, rads, scx, scy, kx, ky)
     easing = easing or lerp
     new 'FaeLib.Task'(function (self, delta)
         self.data.color[4] = math.min(easing(self.data.color[4], 1, delta / fade_in_time), 1)
         love.graphics.setColor(self.data.color[1], self.data.color[2], self.data.color[3], self.data.color[4])
-        love.graphics.print(text, self.data.pos.x, self.data.pos.y)
+        love.graphics.print(text, self.data.pos.x, self.data.pos.y, rads, scx, scy, kx, ky)
     end, false, fade_in_time)
     :with_data({
         color = {rgb_colour[1], rgb_colour[2], rgb_colour[3], 0}, -- Start with alpha = 0
@@ -1049,16 +1112,16 @@ FaeLib.APIs.Drawing.text_ease_alpha = function(text, x, y, rgb_colour, fade_in_t
         function (self, delta)
             self.data.color[4] = math.max(easing(self.data.color[4], 0, delta / fade_out_time), 0)
             love.graphics.setColor(self.data.color[1], self.data.color[2], self.data.color[3], self.data.color[4])
-            love.graphics.print(text, self.data.pos.x, self.data.pos.y)
+            love.graphics.print(text, self.data.pos.x, self.data.pos.y, rads, scx, scy, kx, ky)
         end, false, fade_out_time
     )
 end
-FaeLib.APIs.Drawing.text_ease_alpha_centered = function(text, x, y, rgb_colour, fade_in_time, hold_time, fade_out_time, easing, center_y)
-    easing = easing or lerp
+FaeLib.APIs.Drawing.text_ease_alpha_centered = function(text, x, y, rgb_colour, fade_in_time, hold_time, fade_out_time, easing, rads, scx, scy, kx, ky, center_y)
+    easing = easing or FaeLib.lerp
     new 'FaeLib.Task'(function (self, delta)
         self.data.color[4] = math.min(easing(self.data.color[4], 1, delta / fade_in_time), 1)
         love.graphics.setColor(self.data.color[1], self.data.color[2], self.data.color[3], self.data.color[4])
-        FaeLib.APIs.Drawing.text_centered(text, self.data.pos.x, self.data.pos.y, center_y)
+        FaeLib.APIs.Drawing.text_centered(text, self.data.pos.x, self.data.pos.y, rads, scx, scy, kx, ky, center_y)
     end, false, fade_in_time)
     :with_data({
         color = {rgb_colour[1], rgb_colour[2], rgb_colour[3], 0}, -- Start with alpha = 0
@@ -1069,7 +1132,7 @@ FaeLib.APIs.Drawing.text_ease_alpha_centered = function(text, x, y, rgb_colour, 
         function (self, delta)
             self.data.color[4] = math.max(easing(self.data.color[4], 0, delta / fade_out_time), 0)
             love.graphics.setColor(self.data.color[1], self.data.color[2], self.data.color[3], self.data.color[4])
-            FaeLib.APIs.Drawing.text_centered(text, self.data.pos.x, self.data.pos.y)
+            FaeLib.APIs.Drawing.text_centered(text, self.data.pos.x, self.data.pos.y, rads, scx, scy, kx, ky, center_y)
         end, false, fade_out_time
     )
 end
