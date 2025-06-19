@@ -13,6 +13,140 @@ position = 'after'
 line_prepend = '$indent'
 payload = '''FaeLib.render()'''
 
+[[patches]]
+[patches.pattern]
+target = 'functions/misc_functions.lua'
+pattern = '''G.ARGS.save_run = G.culled_table'''
+position = 'after'
+match_indent = true
+payload = '''
+if FaeLib then 
+    FaeLib.Builtin.Events.Saving.SaveRun:invoke(G.culled_table) 
+end
+'''
+
+
+[[patches]]
+[patches.pattern]
+target = 'game.lua'
+pattern = '''self:prep_stage(G.STAGES.RUN, saveTable and saveTable.STATE or G.STATES.BLIND_SELECT)'''
+position = 'after'
+match_indent = true
+payload = '''
+if FaeLib then
+    if args.savetext then
+        FaeLib.Builtin.Events.Saving.RunDataReset:invoke({from_loading_run=true})
+        FaeLib.Builtin.Events.Saving.LoadRun:invoke(args.savetext) 
+    else
+        FaeLib.Builtin.Events.Saving.RunDataReset:invoke(args) 
+    end
+end
+'''
+
+[[patches]]
+[patches.pattern]
+match_indent = true
+target = "game.lua"
+pattern = '''
+    for k, v in pairs(self.P_SEALS) do
+        G.ARGS.save_progress.UDA[k] = (v.unlocked and 'u' or '')..(v.discovered and 'd' or '')..(v.alerted and 'a' or '')
+    end'''
+position = 'after'
+# match_indent = true
+line_prepend = '$indent'
+payload = '''
+if FaeLib then 
+    FaeLib.Builtin.Events.Saving.SaveProfile:invoke(G.PROFILES[G.SETTINGS.profile]) 
+end
+'''
+
+
+[[patches]]
+[patches.pattern]
+match_indent = true
+target = "functions/common_events.lua"
+pattern = '''function copy_card(other, new_card, card_scale, playing_card, strip_edition)'''
+position = 'after'
+# match_indent = true
+line_prepend = '$indent'
+payload = '''
+if not other.T then
+-- return other
+end
+'''
+
+
+
+
+[[patches]]
+[patches.pattern]
+match_indent = true
+target = "game.lua"
+pattern = '''self:prep_stage(G.STAGES.MAIN_MENU, G.STATES.MENU, true)'''
+position = 'after'
+# match_indent = true
+line_prepend = '$indent'
+payload = '''
+if FaeLib then 
+    FaeLib.Builtin.Events.Saving.LoadProfile:invoke(G.PROFILES[G.SETTINGS.profile])
+    FaeLib.Builtin.Events.Saving.LoadMetadata:invoke(STR_UNPACK(get_compressed(G.SETTINGS.profile..'/'..'meta.jkr') or 'return {}'))
+end
+'''
+[[patches]]
+[patches.pattern]
+match_indent = true
+target = "game.lua"
+pattern = '''table.sort(self.P_JOKER_RARITY_POOLS[i], function (a, b) return a.order < b.order end)
+    end'''
+position = 'after'
+# match_indent = true
+line_prepend = '$indent'
+payload = '''
+'''
+
+
+[[patches]]
+[patches.pattern]
+match_indent = true
+target = "game.lua"
+pattern = '''if G.FILE_HANDLER.settings then'''
+position = 'after'
+# match_indent = true
+line_prepend = '$indent'
+payload = '''
+if FaeLib then 
+    FaeLib.Builtin.Events.Saving.SaveSettings:invoke(G.ARGS.save_settings)
+end
+'''
+
+
+
+[[patches]]
+[patches.pattern]
+match_indent = true
+target = "game.lua"
+pattern = '''self.GAME.current_round.reroll_cost = self.GAME.base_reroll_cost'''
+position = 'after'
+# match_indent = true
+line_prepend = '$indent'
+payload = '''
+if FaeLib then 
+    FaeLib.Builtin.Events.Saving.NewRun:invoke({})
+end
+'''
+
+[[patches]]
+[patches.pattern]
+match_indent = true
+target = "ui.lua"
+pattern = '''local button_active = true'''
+position = 'after'
+# match_indent = true
+line_prepend = '$indent'
+payload = '''
+print("A")
+'''
+
 
 [[patches]]
 [patches.pattern]

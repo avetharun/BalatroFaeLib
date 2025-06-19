@@ -2,7 +2,43 @@ if not FaeLib then
     FaeLib = FaeLib or {}
     FaeLib.stages = FaeLib.stages or {}
 end
+FaeLib.empty_func = function ()end
+FaeLib.noop = function ()end
 if not FaeLib.stages.init then
+    FaeLib.DuplicateHandling = {
+        OVERWRITE = function (tbl, name, old, new)
+            tbl[name]=new
+        end,
+        KEEP = function (tbl, name, old, new)
+            tbl[name]=old
+        end,
+        APPEND = function (tbl, name, old, new)
+            tbl[#tbl+1]=new
+        end,
+        PREPEND = function (tbl, name, old, new)
+            table.insert(tbl, 0, new)
+        end
+    }
+    -- Joins two tables. Default method for conflicts is to append to the end of the new table.
+    FaeLib.JoinTable = function (left, right, duplicate_strategy)
+        if type(left) ~= "table" or type(right) ~= "table" then
+            error(string.format("Expected left and right to both be tables! Found %s, %s", type(left), type(right)))
+            return {}
+        end
+        duplicate_strategy = duplicate_strategy or FaeLib.DuplicateHandling.APPEND
+        local tbl = {}
+        for key, value in pairs(left) do
+            tbl[key] = value
+        end
+        for key, value in pairs(right) do
+            if tbl[key] then
+                duplicate_strategy(tbl, key, tbl[key], value)
+            else
+                tbl[key] = value
+            end
+        end
+        return tbl
+    end
     FaeLib.stages.init = true
     if not class then
         assert(SMODS.load_file("core/lib/class_oop.lua", "faelib"))() -- We use the class-oop API extensively, so we include it globally.
@@ -67,24 +103,23 @@ if not FaeLib.stages.init then
             return get_template_types(self)[1]
         end,
         contains = function (self, ty)
-            local id_ = nil
+            local id_ = ""
             if type(ty) == "string" then
                 id_ = ty
             elseif type(ty) == "table" then
                 id_ = ty.key or ty.id
             end
-            if (type(getmetatable(ty).__getid) == "function") then
+            if (getmetatable(ty) and getmetatable(ty).__getid and type(getmetatable(ty).__getid) == "function") then
                 id_ = getmetatable(ty).__getid()
             end
             if id_ == nil then
                 error("Expected a valid key either in metatable __getid(), or as property \"key\" or \"id\"", 2)
             end
             for _, value in ipairs(self:keys()) do
-                
-                    
-                
+                if id_:sub(0, 2) == "bl" then
+                end
                 if type(value) == "string" and value:sub(1, 1) == "#" and ty:sub(1,1) ~= "#" then
-                    local tag_id = value:sub(2)
+                    local tag_id = value:sub(1)
                     local tag = FaeLib_Tags[tag_id]
                     if tag and tag.contains then
                         if tag:contains(id_) then
@@ -171,7 +206,7 @@ if not FaeLib.stages.init then
         invoke = function(self, ...)
             for _, callback in ipairs(self._callbacks) do
                 if callback and callback.callback then
-                    callback:callback(...)
+                    callback.callback(...)
                 end
             end
         end,
