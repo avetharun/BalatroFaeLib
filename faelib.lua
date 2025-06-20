@@ -627,6 +627,7 @@ local game_main_menu_ref = Game.main_menu
 function Game:main_menu(change_context)
     local ret = game_main_menu_ref(self, change_context)
     
+    G.GAME.round_resets.blind_states = {Small = 'Select', Big = 'Upcoming', Medium= 'Upcoming', Boss = 'Upcoming'}
     UIBox{
         definition = 
         {n=G.UIT.ROOT, config={align = "cm", colour = G.C.UI.TRANSPARENT_DARK}, nodes={
@@ -970,6 +971,7 @@ FaeLib.Builtin.Events.RenderPost = new 'FaeLib.AbstractEventHandler' ()
 FaeLib.Builtin.Events.RenderPre = new 'FaeLib.AbstractEventHandler' ()
 FaeLib.Builtin.Events.InitItemPrototypes = new 'FaeLib.AbstractEventHandler' ()
 FaeLib.Builtin.Events.MainMenuOpened = new 'FaeLib.AbstractEventHandler' ()
+FaeLib.Builtin.Events.ResetBlinds = new 'FaeLib.AbstractEventHandler' ()
 FaeLib.Builtin.Events.Saving = {}
 FaeLib.Builtin.Events.Saving.SaveProfile = new 'FaeLib.AbstractEventHandler' ()
 FaeLib.Builtin.Events.Saving.LoadProfile = new 'FaeLib.AbstractEventHandler' ()
@@ -1508,7 +1510,10 @@ FaeLib.Builtin.Events.Saving.RunDataReset:register(function (data)
         value.on_reset_run_data(data.faelib[index])
     end
 end)
-
+FaeLib.Builtin.StripDecimalAfter = function(num, amount)
+    amount = amount or 2
+    return tonumber(string.format("%."..amount.."f", num))
+end
 FaeLib.Builtin.CurrentlyDraggedCard = nil
 FaeLib.Builtin.PreviouslyDraggedCard = nil
 local cdDrag = Card.drag or Moveable.drag
@@ -1581,20 +1586,30 @@ function Card:update(dt)
                 if k and k:is(CardArea) then
                     if k ~= self.area then
                         if self.config.transferrable_areas and #self.config.transferrable_areas > 0 then
-                            local t = FaeLib.TableContains(self.config.transferrable_areas, k)
                             
-                            for key, value in pairs(self.config.transferrable_areas) do
-                                if value == k then
-                                    local can_add = true
-                                    if value.can_add_card then
-                                        can_add = value:can_add_card(self)
+                            local t = (self.config.transferrable_areas and FaeLib.TableContains(self.config.transferrable_areas, k))
+                            if t and self.config.transferrable_areas then
+                                for key, value in pairs(self.config.transferrable_areas) do
+                                    if k.config.id then
+                                        print(tprint(value))
                                     end
-                                    if can_add then
-                                        self.area:remove_card(self)
-                                        value:emplace(self)
+                                    t = t or k.id and value.for_id and value.for_id == k.id
+                                    t = t or value.for_type and k.config.type == value.for_type
+                                end
+                                for key, value in pairs(self.config.transferrable_areas) do
+                                    if value == k then
+                                        local can_add = true
+                                        if value.can_add_card then
+                                            can_add = value:can_add_card(self)
+                                        end
+                                        if can_add then
+                                            self.area:remove_card(self)
+                                            value:emplace(self)
+                                        end
                                     end
                                 end
                             end
+                           
                         elseif self.config.transferrable then
                             local can_add = true
                             if k.can_add_card then
@@ -1718,3 +1733,11 @@ FaeLib.Builtin.GenCardForPool = function(pool_type, max_rarity)
     end
     return pick_weighted_element(elements)
 end
+
+
+
+
+
+FaeLib.Builtin.Events.ResetBlinds:register(function ()
+    print("Reset blinds (Boss blind completed!)")
+end)

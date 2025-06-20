@@ -134,6 +134,88 @@ if FaeLib then
     FaeLib.Builtin.Events.Saving.NewRun:invoke({})
 end
 '''
+[[patches]]
+[patches.pattern]
+match_indent = true
+target = "game.lua"
+pattern = '''config = {align="bmi", offset = {x=0,y=G.ROOM.T.y + 29},major = G.hand, bond = 'Weak'}'''
+position = 'at'
+# match_indent = true
+line_prepend = '$indent'
+payload = '''
+config = {align="bli", offset = {x=0,y=G.ROOM.T.y + 29},major = G.hand, bond = 'Weak'}
+'''
+[[patches]]
+[patches.pattern]
+match_indent = true
+target = "game.lua"
+pattern = '''
+                G.blind_select = UIBox{
+                    definition = create_UIBox_blind_select(),
+                    config = {align="bli", offset = {x=0,y=G.ROOM.T.y + 29},major = G.hand, bond = 'Weak'}
+                }
+'''
+position = 'at'
+# match_indent = true
+line_prepend = '$indent'
+payload = '''
+G.blind_select = FaeLib.UI.V.WrapBlindChoicesIml(UIBox{
+    definition = create_UIBox_blind_select(),
+    config = {align="bli", offset = {x=0,y=G.ROOM.T.y + 29},major = G.hand, bond = 'Weak'}
+})
+'''
+[[patches]]
+[patches.pattern]
+match_indent = true
+target = "functions/common_events.lua"
+pattern = "Small = 'Select',"
+position = 'after'
+payload = "Medium= 'Select',"
+
+[[patches]]
+[patches.pattern]
+match_indent = true
+target = "functions/UI_definitions.lua"
+pattern = '''table.insert(deck_tables, 
+    {n=G.UIT.R, config={align = "cm", padding = 0.07, no_fill = true}, nodes={
+      {n=G.UIT.O, config={object = G.your_collection[j]}}
+    }}
+    )'''
+position = 'after'
+payload = '''
+G.your_collection[j].config.id = "collection"
+print("?????")
+'''
+[[patches]]
+[patches.pattern]
+match_indent = true
+target = "functions/UI_definitions.lua"
+pattern = "local card = Card(G.your_collection[j].T.x + G.your_collection[j].T.w/2, G.your_collection[j].T.y, G.CARD_W, G.CARD_H, nil, center)"
+position = 'after'
+payload = '''
+card.config.transferrable_areas = {{for_id="collection"}}
+print("A")
+'''
+
+[[patches]]
+[patches.pattern]
+match_indent = true
+target = "functions/common_events.lua"
+pattern = "G.GAME.round_resets.blind_states.Boss = 'Upcoming'"
+position = 'after'
+payload = '''
+if FaeLib then
+    FaeLib.Builtin.Events.ResetBlinds:invoke({})
+end
+'''
+
+[[patches]]
+[patches.pattern]
+match_indent = true
+target = "functions/UI_definitions.lua"
+pattern = '''config = {align="bmi", offset = {x=0,y=G.ROOM.T.y + 29},major = G.hand, bond = 'Weak'}'''
+position = 'at'
+payload = ""
 
 [[patches]]
 [patches.pattern]
